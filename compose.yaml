@@ -1,0 +1,77 @@
+version : '3.4'
+x-common-variables: &common-variables
+    MYSQL_ROOT_PASSWORD: root
+    MINIO_ROOT_USER: local
+    MINIO_ROOT_PASSWORD: Password01!
+    MINIO_DEFAULT_BUCKETS: migrations
+    MINIO_SERVER_ACCESS_KEY: local
+    MINIO_SERVER_SECRET_KEY: Password01!
+
+services:
+    mysql:
+        image: mysql
+        environment: *common-variables
+        ports:
+            - "3306:3306"
+        volumes:
+            - "./data/init.sql:/docker-entrypoint-initdb.d/init.sql"
+            - my-db:/var/lib/mysql
+    minio:
+        image: docker.io/bitnami/minio:2022
+        platform: linux/x86_64
+        ports:
+        - '9000:9000'
+        - '9001:9001'
+        networks:
+        - minionetwork
+        volumes:
+        - 'minio_data:/data'
+        environment: *common-variables
+    zookeeper:
+        networks:
+        - minionetwork
+        image: confluentinc/cp-zookeeper:latest
+        environment:
+            ZOOKEEPER_CLIENT_PORT: 2181
+            ZOOKEEPER_TICK_TIME: 2000
+        ports:
+        - 2181:2181
+        
+    kafka:
+        networks:
+        - minionetwork
+        image: confluentinc/cp-kafka:latest
+        platform: linux/x86_64
+        depends_on:
+        - zookeeper
+        ports:
+        - 9092:9092
+        - 29092:29092
+        environment:
+            KAFKA_BROKER_ID: 1
+            KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+            KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,CONNECTIONS_FROM_HOST://localhost:29092
+            KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONNECTIONS_FROM_HOST:PLAINTEXT
+            KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+            KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+            KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 100
+            AUTO_CREATE_TOPICS: "true"
+    kafdrop:
+        image: obsidiandynamics/kafdrop
+        platform: linux/x86_64
+        networks:
+        - minionetwork
+        ports:
+        - "3001:9000"
+        environment:
+            KAFKA_BROKERCONNECT: "kafka:9092"
+        depends_on:
+        - "kafka"
+networks:
+    minionetwork:
+        driver: bridge
+
+volumes:
+    minio_data:
+        driver: local
+    my-db:
