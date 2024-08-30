@@ -27,3 +27,5 @@ Algunas mejoras pendientes son:
 [ ] Separar en servicios mas chicos cada componente.
 
 [ ] Transaccionar la update del status con el envio del mensaje terminado a la queue de kafka
+
+[ ] Agregar mas partitions y brokers de kafka si queremos escalar esto

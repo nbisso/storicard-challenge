@@ -41,6 +41,8 @@ func (m *migrationUsecases) NewMigration(ctx context.Context, req domain.Migrati
 	if err != nil {
 		newmigration.Status = domain.Failed
 		newmigration.Summary = err.Error()
+
+		return newmigration, err
 	}
 
 	newmigration.CsvPath = file
@@ -50,6 +52,8 @@ func (m *migrationUsecases) NewMigration(ctx context.Context, req domain.Migrati
 	if err != nil {
 		res.Status = domain.Failed
 		res.Summary = err.Error()
+
+		return newmigration, err
 	}
 
 	filevent := domain.NewFileEvent{
@@ -61,6 +65,8 @@ func (m *migrationUsecases) NewMigration(ctx context.Context, req domain.Migrati
 	if err != nil {
 		res.Status = domain.Failed
 		res.Summary = err.Error()
+
+		return newmigration, nil
 	}
 
 	err = m.qc.SendMessage(json)
@@ -68,6 +74,8 @@ func (m *migrationUsecases) NewMigration(ctx context.Context, req domain.Migrati
 	if err != nil {
 		res.Status = domain.Failed
 		res.Summary = err.Error()
+
+		return newmigration, err
 	}
 
 	return *res, nil

@@ -33,6 +33,11 @@ func (f *fileProcessor) Start(ctx context.Context) {
 	go func() {
 		defer f.qc.Close()
 		for {
+
+			if ctx.Err() != nil {
+				break
+			}
+
 			msg, err := f.qc.ReadMessage()
 			if err == nil {
 				fmt.Printf("Message on %s: %s\n", msg.TopicPartition, string(msg.Value))
@@ -73,7 +78,7 @@ func (f *fileProcessor) Start(ctx context.Context) {
 				if err != nil {
 					log.Printf("Failed to init transaction: %s", err)
 
-					break
+					continue
 				}
 
 				err = st.BeginTransaction()
@@ -81,7 +86,7 @@ func (f *fileProcessor) Start(ctx context.Context) {
 				if err != nil {
 					log.Printf("Failed to init transaction: %s", err)
 
-					break
+					continue
 				}
 
 				for _, migration := range transactions {
@@ -104,7 +109,7 @@ func (f *fileProcessor) Start(ctx context.Context) {
 							log.Printf("Failed to rollback transaction: %s", err)
 						}
 
-						return
+						continue
 
 					}
 				}
@@ -120,7 +125,7 @@ func (f *fileProcessor) Start(ctx context.Context) {
 						log.Printf("Failed to rollback transaction: %s", err)
 					}
 
-					return
+					continue
 				}
 
 				err = f.qc.CommitMessage(msg)
@@ -134,7 +139,7 @@ func (f *fileProcessor) Start(ctx context.Context) {
 						log.Printf("Failed to rollback transaction: %s", err)
 					}
 
-					return
+					continue
 				}
 
 				err = st.CommitTransaction(ctx)
@@ -142,7 +147,7 @@ func (f *fileProcessor) Start(ctx context.Context) {
 				if err != nil {
 					log.Printf("Failed to commit transaction: %s", err)
 
-					return
+					continue
 				}
 
 				fmt.Printf("Message committed\n")
