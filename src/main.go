@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 
+	_ "github.com/nbisso/storicard-challenge/docs"
+
 	"github.com/nbisso/storicard-challenge/infrastracture/conf"
 	"github.com/nbisso/storicard-challenge/infrastracture/http"
 )

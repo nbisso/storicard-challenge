@@ -1,0 +1,111 @@
+definitions:
+  domain.Migration:
+    properties:
+      created_at:
+        type: string
+      csv_path:
+        type: string
+      id:
+        type: integer
+      processed_lines:
+        type: integer
+      status:
+        $ref: '#/definitions/domain.MigrationStatus'
+      summary:
+        type: string
+      total_lines:
+        type: integer
+      updated_at:
+        type: string
+    type: object
+  domain.MigrationStatus:
+    enum:
+    - pending
+    - complete
+    - failed
+    - processing
+    type: string
+    x-enum-varnames:
+    - Pending
+    - Complete
+    - Failed
+    - Processing
+  domain.TransactionResult:
+    properties:
+      balance:
+        default: 0
+        type: number
+      total_credits:
+        default: 0
+        type: number
+      total_debits:
+        default: 0
+        type: number
+    type: object
+info:
+  contact: {}
+paths:
+  /migrations:
+    post:
+      consumes:
+      - application/json
+      description: Migrations
+      parameters:
+      - description: file
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.Migration'
+      summary: Migrations
+      tags:
+      - Migrations
+  /ping:
+    get:
+      description: ping
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+      summary: ping
+      tags:
+      - ping
+  /users/{id}/transactions:
+    get:
+      consumes:
+      - application/json
+      description: Transactions
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: from
+        in: query
+        name: from
+        type: string
+      - description: to
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.TransactionResult'
+      summary: Transactions
+      tags:
+      - Transactions
+swagger: "2.0"

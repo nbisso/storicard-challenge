@@ -8,6 +8,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/nbisso/storicard-challenge/registry"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 type Server struct {
@@ -24,6 +26,7 @@ func (s *Server) Run(port string) (chan os.Signal, *registry.Registry) {
 		r := gin.Default()
 
 		RegisterRoutes(r, reg)
+		r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 		r.Run(fmt.Sprintf(":%s", port))
 	}()

@@ -16,6 +16,12 @@ Tenemos 2 topics:
 * Topico de files
 * Topico de eventos
 
+Se agregaron test en los componentes mas criticos unitarios.
+
+Se agrego la doc de swagger:
+
+http://localhost:8080/swagger/index.html
+
 Algunas mejoras pendientes son:
 
 [ ] Agregar una retry-queue en el procesamiento de eventos
