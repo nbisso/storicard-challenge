@@ -17,6 +17,7 @@
                 "KAFKA_HOST": "localhost:29092",
                 "FILE_TOPIC": "file",
                 "EVENT_TOPIC": "event",
+                "FINISH_TOPIC": "finish_file",
             }
         }
     ]

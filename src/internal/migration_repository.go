@@ -17,8 +17,10 @@ type MigrationRepository interface {
 	GetMigrationFile(ctx context.Context, path string) ([]byte, error)
 	UpdateMigration(ctx context.Context, m domain.Migration) error
 	GetMigrationByFilename(ctx context.Context, filename string) (*domain.Migration, error)
-	SaveTransaction(ctx context.Context, transaction domain.Transaction) error
+	SaveTransaction(ctx context.Context, transaction domain.Transaction, file string) error
 	GetUserBalance(ctx context.Context, tfilter domain.TransactionFilter) (domain.TransactionResult, error)
+	GetFinishedMigrations(ctx context.Context) ([]domain.Migration, error)
+	UpdateMigrationStatus(ctx context.Context, id int, status domain.MigrationStatus) error
 }
 
 type migrationRepository struct {
@@ -104,11 +106,25 @@ func (mr *migrationRepository) GetMigrationByFilename(ctx context.Context, filen
 	return &migrations[0], nil
 }
 
-func (mr *migrationRepository) SaveTransaction(ctx context.Context, transaction domain.Transaction) error {
-	_, err := mr.db.NamedExec(
+func (mr *migrationRepository) SaveTransaction(ctx context.Context, transaction domain.Transaction, file string) error {
+	tx := mr.db.MustBegin()
+
+	_, err := tx.NamedExec(
 		"INSERT INTO transaction (user_id, amount, date_time) VALUES (:user_id, :amount, :datetime)",
 		transaction,
 	)
+
+	if err != nil {
+		tx.Rollback()
+	}
+
+	_, err = tx.Exec("UPDATE migration SET processed_lines=processed_lines+1 WHERE csv_path=?", file)
+
+	if err != nil {
+		tx.Rollback()
+	}
+
+	err = tx.Commit()
 
 	return err
 
@@ -116,6 +132,18 @@ func (mr *migrationRepository) SaveTransaction(ctx context.Context, transaction 
 
 func (mr *migrationRepository) GetUserBalance(ctx context.Context, tfilter domain.TransactionFilter) (domain.TransactionResult, error) {
 	transaction := []domain.TransactionResult{}
+
+	userexists := false
+
+	err := mr.db.Get(&userexists, "SELECT EXISTS(SELECT 1 FROM transaction WHERE user_id=?)", tfilter.UserID)
+
+	if err != nil {
+		return domain.TransactionResult{}, err
+	}
+
+	if !userexists {
+		return domain.TransactionResult{}, domain.ErrUserNotFound
+	}
 
 	query := "SELECT SUM(amount) as balance, COUNT(CASE WHEN amount < 0 THEN amount ELSE NULL END) as total_debits, COUNT(CASE WHEN amount > 0 THEN amount ELSE NULL END) as total_credits FROM transaction WHERE user_id=?"
 
@@ -131,7 +159,7 @@ func (mr *migrationRepository) GetUserBalance(ctx context.Context, tfilter domai
 		args = append(args, tfilter.To)
 	}
 
-	err := mr.db.Select(&transaction,
+	err = mr.db.Select(&transaction,
 		query,
 		args...)
 
@@ -140,4 +168,22 @@ func (mr *migrationRepository) GetUserBalance(ctx context.Context, tfilter domai
 	}
 
 	return transaction[0], nil
+}
+
+func (mr *migrationRepository) GetFinishedMigrations(ctx context.Context) ([]domain.Migration, error) {
+	migrations := []domain.Migration{}
+
+	err := mr.db.Select(&migrations, "SELECT * FROM migration WHERE status != 'complete' AND total_lines = processed_lines")
+
+	if err != nil {
+		return nil, err
+	}
+
+	return migrations, nil
+}
+
+func (mr *migrationRepository) UpdateMigrationStatus(ctx context.Context, id int, status domain.MigrationStatus) error {
+	_, err := mr.db.Exec("UPDATE migration SET status=? WHERE id=?", status, id)
+
+	return err
 }

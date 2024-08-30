@@ -1,4 +1,4 @@
-version : '3.4'
+version: '3.4'
 x-common-variables: &common-variables
     MYSQL_ROOT_PASSWORD: root
     MINIO_ROOT_USER: local
@@ -10,12 +10,21 @@ x-common-variables: &common-variables
 services:
     mysql:
         image: mysql
+        platform: linux/x86_64
+        networks:
+        - minionetwork
         environment: *common-variables
         ports:
             - "3306:3306"
         volumes:
             - "./data/init.sql:/docker-entrypoint-initdb.d/init.sql"
             - my-db:/var/lib/mysql
+        healthcheck:
+            test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+
     minio:
         image: docker.io/bitnami/minio:2022
         platform: linux/x86_64
@@ -27,6 +36,12 @@ services:
         volumes:
         - 'minio_data:/data'
         environment: *common-variables
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+
     zookeeper:
         networks:
         - minionetwork
@@ -34,6 +49,7 @@ services:
         environment:
             ZOOKEEPER_CLIENT_PORT: 2181
             ZOOKEEPER_TICK_TIME: 2000
+        platform: linux/x86_64
         ports:
         - 2181:2181
         
@@ -53,20 +69,64 @@ services:
             KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,CONNECTIONS_FROM_HOST://localhost:29092
             KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONNECTIONS_FROM_HOST:PLAINTEXT
             KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-            KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
             KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 100
             AUTO_CREATE_TOPICS: "true"
+            KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+            KSQL_KSQL_STREAMS_REPLICATION_FACTOR: 1
+            CONTROL_CENTER_REPLICATION_FACTOR: 1
+            KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+            KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+        healthcheck:
+            test: kafka-topics --bootstrap-server kafka:9092 --list
+            interval: 30s
+            timeout: 10s
+            retries: 3
     kafdrop:
         image: obsidiandynamics/kafdrop
         platform: linux/x86_64
         networks:
         - minionetwork
+        depends_on:
+            kafka:
+                condition: service_healthy
         ports:
         - "3001:9000"
         environment:
             KAFKA_BROKERCONNECT: "kafka:9092"
+
+
+    backend:
+        build: 
+            context: .
+            dockerfile: Dockerfile
+            platforms:
+            - linux/x86_64
+        platform: linux/x86_64
+        restart: always
+        networks:
+        - minionetwork
+        ports:
+        - "8080:8080"
         depends_on:
-        - "kafka"
+            mysql:
+                condition: service_healthy
+            minio:
+                condition: service_healthy
+            kafka:
+                condition: service_healthy
+        environment:
+            PORT: 8080
+            DB_DRIVER: mysql
+            DB_DSN: root:root@tcp(mysql:3306)/stori?parseTime=true
+            MINIO_ENDPOINT: minio:9000
+            MINIO_ACCESS_KEY: local
+            MINIO_SECRET_KEY: Password01!
+            MINIO_USE_SSL: false
+            KAFKA_HOST: kafka:9092
+            FILE_TOPIC: file
+            EVENT_TOPIC: event
+            FINISH_TOPIC: finish_file
+
 networks:
     minionetwork:
         driver: bridge
@@ -75,3 +135,4 @@ volumes:
     minio_data:
         driver: local
     my-db:
+

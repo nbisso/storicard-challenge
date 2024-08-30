@@ -12,8 +12,10 @@ type MigrationUsecases interface {
 	GetMigrationFile(ctx context.Context, filename string) (string, error)
 	UpdateMigration(ctx context.Context, migration domain.Migration) error
 	GetMigrationByFilename(ctx context.Context, filename string) (*domain.Migration, error)
-	SaveTransaction(ctx context.Context, transaction domain.Transaction) error
+	SaveTransaction(ctx context.Context, transaction domain.Transaction, file string) error
 	GetUserBalance(ctx context.Context, tfilter domain.TransactionFilter) (domain.TransactionResult, error)
+	GetFinishedMigrations(ctx context.Context) ([]domain.Migration, error)
+	UpdateMigrationStatus(ctx context.Context, id int, status domain.MigrationStatus) error
 }
 
 type migrationUsecases struct {
@@ -90,10 +92,36 @@ func (m *migrationUsecases) GetMigrationByFilename(ctx context.Context, filename
 	return m.mr.GetMigrationByFilename(ctx, filename)
 }
 
-func (m *migrationUsecases) SaveTransaction(ctx context.Context, transaction domain.Transaction) error {
-	return m.mr.SaveTransaction(ctx, transaction)
+func (m *migrationUsecases) SaveTransaction(ctx context.Context, transaction domain.Transaction, file string) error {
+	return m.mr.SaveTransaction(ctx, transaction, file)
 }
 
 func (m *migrationUsecases) GetUserBalance(ctx context.Context, tfilter domain.TransactionFilter) (domain.TransactionResult, error) {
-	return m.mr.GetUserBalance(ctx, tfilter)
+	b, err := m.mr.GetUserBalance(ctx, tfilter)
+
+	if err != nil {
+		return domain.TransactionResult{}, err
+	}
+
+	if b.Balance == nil {
+		b.Balance = new(float64)
+	}
+
+	if b.TotalCredits == nil {
+		b.TotalCredits = new(float64)
+	}
+
+	if b.TotalDebits == nil {
+		b.TotalDebits = new(float64)
+	}
+
+	return b, nil
+}
+
+func (m *migrationUsecases) GetFinishedMigrations(ctx context.Context) ([]domain.Migration, error) {
+	return m.mr.GetFinishedMigrations(ctx)
+}
+
+func (m *migrationUsecases) UpdateMigrationStatus(ctx context.Context, id int, status domain.MigrationStatus) error {
+	return m.mr.UpdateMigrationStatus(ctx, id, status)
 }

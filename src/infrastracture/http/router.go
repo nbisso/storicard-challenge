@@ -1,6 +1,7 @@
 package http
 
 import (
+	"errors"
 	"io"
 
 	"github.com/gin-gonic/gin"
@@ -63,13 +64,22 @@ func RegisterRoutes(r *gin.Engine, reg *registry.Registry) {
 			})
 		}
 
-		filter.UserID = userID
-
 		c.ShouldBindQuery(&filter)
+
+		filter.UserID = userID
 
 		result, err := reg.MigrationUsecases.GetUserBalance(c.Request.Context(), filter)
 
 		if err != nil {
+
+			if errors.Is(err, domain.ErrUserNotFound) {
+				c.JSON(404, gin.H{
+					"error": err.Error(),
+				})
+
+				return
+			}
+
 			c.JSON(500, gin.H{
 				"error": err.Error(),
 			})

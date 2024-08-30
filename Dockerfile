@@ -1,20 +1,19 @@
-FROM golang-alpine as builder
+FROM golang:1.21.6-alpine as builder
+
+RUN apk add alpine-sdk
 
 WORKDIR /app
 
-COPY go.mod go.sum ./
+COPY ./src /app
 
 RUN go mod download
 
-COPY ./src .
+RUN GOOS=linux GOARCH=amd64 go build -o api -tags musl
 
-RUN go build -o main .
+FROM alpine:latest as runner
 
-FROM alpine
+WORKDIR /root/
 
-WORKDIR /app
+COPY --from=builder /app/api /api
 
-COPY --from=builder /app/main .
-
-CMD ["./main"]
-
+ENTRYPOINT /api

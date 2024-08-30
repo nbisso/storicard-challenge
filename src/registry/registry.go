@@ -30,6 +30,14 @@ func NewRegistry() *Registry {
 
 	tp.Start(context.Background())
 
+	status := r.NewStatusUpdater()
+
+	status.Watch()
+
+	ffp := r.NewFinishFileProcesssor()
+
+	ffp.Start(context.Background())
+
 	return &Registry{
 		MigrationUsecases: r.NewMigrationUsecases(),
 		Register:          r,
@@ -60,6 +68,12 @@ func (r *register) NewFileProcessor() internal.FileProcessor {
 	return internal.NewFileProcessor(r.NewMigrationUsecases(),
 		r.NewQueueConsumerClient(conf.Instance.Kafka.FileTopic),
 		r.NewQueueSenderClient(conf.Instance.Kafka.EventTopic))
+}
+
+func (r *register) NewFinishFileProcesssor() internal.FinishFileProcesssor {
+	return internal.NewFinishFileProcesssor(r.NewMigrationUsecases(),
+		r.NewQueueConsumerClient(conf.Instance.Kafka.FinishTopic),
+	)
 }
 
 func (r *register) CleanUp() {

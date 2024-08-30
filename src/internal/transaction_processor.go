@@ -41,10 +41,18 @@ func (f *transactionProcesssor) Start(ctx context.Context) {
 					log.Printf("Failed parse message: %s", err)
 				}
 
-				err = f.mu.SaveTransaction(ctx, *transaction)
+				file := ""
+
+				for _, t := range msg.Headers {
+					if t.Key == "file" {
+						file = string(t.Value)
+					}
+				}
+
+				err = f.mu.SaveTransaction(ctx, *transaction, file)
 
 				if err != nil {
-					log.Printf("Failed to commit message: %s", err)
+					log.Printf("Failed to save transaction message: %s", err)
 				}
 
 				err = f.qcTrans.CommitMessage(msg)

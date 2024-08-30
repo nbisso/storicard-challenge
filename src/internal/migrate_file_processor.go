@@ -68,6 +68,22 @@ func (f *fileProcessor) Start(ctx context.Context) {
 				m.Lines = len(transactions)
 				m.Status = domain.Processing
 
+				st, err := f.qcTrans.InitTransaction(ctx)
+
+				if err != nil {
+					log.Printf("Failed to init transaction: %s", err)
+
+					break
+				}
+
+				err = st.BeginTransaction()
+
+				if err != nil {
+					log.Printf("Failed to init transaction: %s", err)
+
+					break
+				}
+
 				for _, migration := range transactions {
 					j, err := migration.ToJson()
 
@@ -75,10 +91,21 @@ func (f *fileProcessor) Start(ctx context.Context) {
 						log.Printf("Failed to convert to json: %s", err)
 					}
 
-					err = f.qcTrans.SendMessage(string(j))
+					err = st.SendMessageWithHeaders(string(j), map[string]string{
+						"file": filereq.FileName,
+					})
 
 					if err != nil {
 						log.Printf("Failed to send message: %s", err)
+
+						err = st.RollbackTransaction(ctx)
+
+						if err != nil {
+							log.Printf("Failed to rollback transaction: %s", err)
+						}
+
+						return
+
 					}
 				}
 
@@ -86,12 +113,36 @@ func (f *fileProcessor) Start(ctx context.Context) {
 
 				if err != nil {
 					log.Printf("Failed to update migration: %s", err)
+
+					err = st.RollbackTransaction(ctx)
+
+					if err != nil {
+						log.Printf("Failed to rollback transaction: %s", err)
+					}
+
+					return
 				}
 
 				err = f.qc.CommitMessage(msg)
 
 				if err != nil {
 					log.Printf("Failed to commit message: %s", err)
+
+					err = st.RollbackTransaction(ctx)
+
+					if err != nil {
+						log.Printf("Failed to rollback transaction: %s", err)
+					}
+
+					return
+				}
+
+				err = st.CommitTransaction(ctx)
+
+				if err != nil {
+					log.Printf("Failed to commit transaction: %s", err)
+
+					return
 				}
 
 				fmt.Printf("Message committed\n")
